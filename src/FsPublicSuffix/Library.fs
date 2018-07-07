@@ -176,7 +176,7 @@ module Parser =
                   Domain         = parseDomain registrable
                   SubDomain      = tryParseSubdomain domain registrable })
 
-        static member Parse (domain: string) : DomainType =
+        static member Parse (domain: string) : ParsedDomain =
             match Domain.TryParse domain with
             | Some x -> ValidDomain x 
             | _ -> InvalidDomain
@@ -186,6 +186,6 @@ module Parser =
             | Some sub -> sprintf "%s.%s.%s" sub x.Domain x.TopLevelDomain
             | None     -> sprintf "%s.%s" x.Domain x.TopLevelDomain
     
-    and DomainType =
+    and ParsedDomain =
         | ValidDomain of Domain
         | InvalidDomain
