@@ -26,6 +26,9 @@ module Util =
     let takeEndLabels count =
         Array.rev >> Array.take count >> Array.rev >> joinlabels
 
+    let internal toLower (x: string) = 
+        x.ToLower()
+
     let private idn = new IdnMapping()
 
     let toAscii domain =
@@ -116,7 +119,7 @@ module Parser =
         
         if domain.StartsWith "." then None else
         
-        let domainLabels = domain.ToLower() |> splitLabels
+        let domainLabels = toLower domain |> splitLabels
         
         let registrableLabels =
             match findMatch domain with
@@ -132,13 +135,13 @@ module Parser =
     let internal parseTld =
         splitLabels >> skipLabels 1
 
-    /// try to extract the Top Level Domain
+    /// Try to extract the Top Level Domain
     let getTld (domain: string) = 
         getRegistrablePart domain
         |> Option.map parseTld
 
     let internal tryParseSubdomain (domain: string) (registrable: string) =
-        let domainLabels = splitLabels domain
+        let domainLabels = splitLabels domain |> Array.map toLower
         let regLabels    = splitLabels registrable
 
         if domainLabels.Length > regLabels.Length
@@ -177,6 +180,11 @@ module Parser =
             match Domain.TryParse domain with
             | Some x -> ValidDomain x 
             | _ -> InvalidDomain
+
+        member x.Hostname = 
+            match x.SubDomain with
+            | Some sub -> sprintf "%s.%s.%s" sub x.Domain x.TopLevelDomain
+            | None     -> sprintf "%s.%s" x.Domain x.TopLevelDomain
     
     and DomainType =
         | ValidDomain of Domain
