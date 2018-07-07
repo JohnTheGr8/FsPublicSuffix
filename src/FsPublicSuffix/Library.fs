@@ -1,8 +1,22 @@
 namespace FsPublicSuffix
 
 open System
+open System.Globalization
 open System.Net
 open System.Text
+
+[<AutoOpen>]
+module Util =
+    let splitLabels (domain: string) =
+        domain.Split '.'
+
+    let private idn = new IdnMapping()
+
+    let toAscii domain =
+        try
+            idn.GetAscii domain
+        with _ ->
+            domain
 
 module PublicSuffix =
 
@@ -39,6 +53,29 @@ module PublicSuffix =
     
     let RuleSet =
         loadRuleSet |> Array.map RegistrationRule.Read
+
+    let isMatch (rule: string) (domain: string) =
+        let domain = toAscii domain
+        let ruleLabels   = (toAscii rule) |> splitLabels |> Array.rev
+        let domainLabels = domain |> splitLabels |> Array.rev
+
+        if domainLabels.Length < ruleLabels.Length
+        then 
+            Error "The domain must contain as many or more labels than the rule"
+        else 
+            let domainLabels = domainLabels |> Array.take ruleLabels.Length
+                
+            if Array.zip ruleLabels domainLabels
+               |> Array.forall (fun (r,d) -> r = d || r = "*")
+            then Ok rule
+            else Error "For every pair of domain and rule label, either they are identical, or that the label from the rule is"
+
+    let findMatches (domain: string) =
+        RuleSet
+        |> Array.filter (fun rule ->
+            match isMatch rule.Value domain with
+            | Ok _ -> true
+            | _ -> false )
 
 module Parser =
 
