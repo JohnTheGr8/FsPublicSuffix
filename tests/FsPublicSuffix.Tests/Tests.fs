@@ -30,7 +30,7 @@ let tests =
       let rule = RegistrationRule.Read
 
       let (=*=) (rule: RegistrationRule) domain =
-        Expect.isOk (isMatch rule.Value domain) "Domain should match the rule"
+        Expect.isSome (tryMatch domain rule) "Domain should match the rule"
 
       rule "com" =*= "foo.com"
       rule "*.jp" =*= "foo.bar.jp"
@@ -42,43 +42,43 @@ let tests =
   ]
 
 [<Tests>]
-let RegistrableTests =
-  testList "Registrable Domains" [
-    // test with the Test Data from https://raw.githubusercontent.com/publicsuffix/list/master/tests/test_psl.txt
-    testCase "Test Ddata" <| fun _ ->
-      
-      let checkPublicSuffix = Parser.getRegistrablePart
+let RegistrablePartTests =
 
-      let (===) actual expected =
-        Expect.equal actual expected "Registrable domain doesn't match"
+  let checkPublicSuffix = Parser.getRegistrablePart
 
-      // null input.
+  let (===) actual expected =
+    Expect.equal actual expected "Registrable domain doesn't match"
+  
+  // test with the Test Data from https://raw.githubusercontent.com/publicsuffix/list/master/tests/test_psl.txt
+  testList "Registrable Domain Part" [
+    
+    testCase "null input" <| fun _ ->
       checkPublicSuffix "" === None
 
-      // Mixed case.
+    testCase "Mixed case" <| fun _ ->
       checkPublicSuffix "COM" === None
       checkPublicSuffix "example.COM" === Some "example.com"
       checkPublicSuffix "WwW.example.COM" === Some "example.com"
 
-      // Leading dot.
+    testCase "Leading dot" <| fun _ ->
       checkPublicSuffix ".com" === None
       checkPublicSuffix ".example" === None
       checkPublicSuffix ".example.com" === None
       checkPublicSuffix ".example.example" === None
 
-      // Unlisted TLD.
+    testCase "Unlisted TLD" <| fun _ ->
       checkPublicSuffix "example" === None
       checkPublicSuffix "example.example" === Some "example.example"
       checkPublicSuffix "b.example.example" === Some "example.example"
       checkPublicSuffix "a.b.example.example" === Some "example.example"
 
-      // TLD with only 1 rule.
+    testCase "TLD with only 1 rule" <| fun _ ->
       checkPublicSuffix "biz" === None
       checkPublicSuffix "domain.biz" === Some "domain.biz"
       checkPublicSuffix "b.domain.biz" === Some "domain.biz"
       checkPublicSuffix "a.b.domain.biz" === Some "domain.biz"
 
-      // TLD with some 2-level rules.
+    testCase "TLD with some 2-level rules" <| fun _ ->
       checkPublicSuffix "com" === None
       checkPublicSuffix "example.com" === Some "example.com"
       checkPublicSuffix "b.example.com" === Some "example.com"
@@ -89,13 +89,13 @@ let RegistrableTests =
       checkPublicSuffix "a.b.example.uk.com" === Some "example.uk.com"
       checkPublicSuffix "test.ac" === Some "test.ac"
 
-      // TLD with only 1 (wildcard) rule.
+    testCase "TLD with only 1 (wildcard) rule" <| fun _ ->
       checkPublicSuffix "mm" === None
       checkPublicSuffix "c.mm" === None
       checkPublicSuffix "b.c.mm" === Some "b.c.mm"
       checkPublicSuffix "a.b.c.mm" === Some "b.c.mm"
 
-      // More complex TLD.
+    testCase "More complex TLD" <| fun _ ->
       checkPublicSuffix "jp" === None
       checkPublicSuffix "test.jp" === Some "test.jp"
       checkPublicSuffix "www.test.jp" === Some "test.jp"
@@ -113,7 +113,7 @@ let RegistrableTests =
       checkPublicSuffix "city.kobe.jp" === Some "city.kobe.jp"
       checkPublicSuffix "www.city.kobe.jp" === Some "city.kobe.jp"
 
-      // TLD with a wildcard rule and exceptions.
+    testCase "TLD with a wildcard rule and exceptions" <| fun _ ->
       checkPublicSuffix "ck" === None
       checkPublicSuffix "test.ck" === None
       checkPublicSuffix "b.test.ck" === Some "b.test.ck"
@@ -121,7 +121,7 @@ let RegistrableTests =
       checkPublicSuffix "www.ck" === Some "www.ck"
       checkPublicSuffix "www.www.ck" === Some "www.ck"
 
-      // US K12.
+    testCase "US K12" <| fun _ ->
       checkPublicSuffix "us" === None
       checkPublicSuffix "test.us" === Some "test.us"
       checkPublicSuffix "www.test.us" === Some "test.us"
@@ -132,7 +132,7 @@ let RegistrableTests =
       checkPublicSuffix "test.k12.ak.us" === Some "test.k12.ak.us"
       checkPublicSuffix "www.test.k12.ak.us" === Some "test.k12.ak.us"
 
-      // IDN labels.
+    testCase "IDN labels" <| fun _ ->
       checkPublicSuffix "食狮.com.cn" === Some "食狮.com.cn"
       checkPublicSuffix "食狮.公司.cn" === Some "食狮.公司.cn"
       checkPublicSuffix "www.食狮.公司.cn" === Some "食狮.公司.cn"
@@ -143,7 +143,7 @@ let RegistrableTests =
       checkPublicSuffix "shishi.中国" === Some "shishi.中国"
       checkPublicSuffix "中国" === None
 
-      // Same as above, but punycoded.
+    testCase "Same as above, but punycoded" <| fun _ ->
       checkPublicSuffix "xn--85x722f.com.cn" === Some "xn--85x722f.com.cn"
       checkPublicSuffix "xn--85x722f.xn--55qx5d.cn" === Some "xn--85x722f.xn--55qx5d.cn"
       checkPublicSuffix "www.xn--85x722f.xn--55qx5d.cn" === Some "xn--85x722f.xn--55qx5d.cn"
