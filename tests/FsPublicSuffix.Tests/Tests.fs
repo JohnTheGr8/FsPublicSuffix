@@ -3,6 +3,7 @@ module Tests
 
 open Expecto
 open FsPublicSuffix
+open PublicSuffix
 
 [<Tests>]
 let tests =
@@ -24,4 +25,18 @@ let tests =
       punycode "shishi.中国" === "shishi.xn--fiqs8s"
       punycode "中国" === "xn--fiqs8s"
 
+    testCase "Test Rule Matches" <| fun _ ->
+
+      let rule = RegistrationRule.Read
+
+      let (=*=) (rule: RegistrationRule) domain =
+        Expect.isOk (isMatch rule.Value domain) "Domain should match the rule"
+
+      rule "com" =*= "foo.com"
+      rule "*.jp" =*= "foo.bar.jp"
+      rule "*.jp" =*= "bar.jp"
+      
+      rule "公司.cn" =*= "xn--55qx5d.cn"
+      rule "公司.cn" =*= "xn--85x722f.xn--55qx5d.cn"
+      rule "公司.cn" =*= "公司.cn"
   ]

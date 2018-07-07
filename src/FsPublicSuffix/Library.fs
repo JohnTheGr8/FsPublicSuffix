@@ -7,8 +7,15 @@ open System.Text
 
 [<AutoOpen>]
 module Util =
+
     let splitLabels (domain: string) =
         domain.Split '.'
+
+    let joinlabels : string array -> string = 
+        String.concat "."
+
+    let countLabels =
+        splitLabels >> Array.length
 
     let private idn = new IdnMapping()
 
@@ -76,6 +83,18 @@ module PublicSuffix =
             match isMatch rule.Value domain with
             | Ok _ -> true
             | _ -> false )
+
+    // find the best matching rule for the given domain
+    let findMatch (domain: string) =
+        let matchingRules = findMatches domain
+        
+        matchingRules
+        |> Array.tryFind (function Exception _ -> true | _ -> false)
+        |> Option.defaultValue (
+            matchingRules
+            |> Array.sortByDescending (fun rule -> countLabels rule.Value)
+            |> Array.tryHead 
+            |> Option.defaultValue (SimpleRule "*"))
 
 module Parser =
 
