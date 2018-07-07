@@ -17,6 +17,12 @@ module Util =
     let countLabels =
         splitLabels >> Array.length
 
+    let skipLabels count =
+        Array.skip count >> joinlabels
+
+    let takeEndLabels count =
+        Array.rev >> Array.take count >> Array.rev >> joinlabels
+
     let private idn = new IdnMapping()
 
     let toAscii domain =
@@ -97,6 +103,26 @@ module PublicSuffix =
             |> Option.defaultValue (SimpleRule "*"))
 
 module Parser =
+
+    open PublicSuffix
+
+    let getRegistrablePart (domain: string) =
+        
+        if domain.StartsWith "." then None else
+        
+        let domainLabels = domain.ToLower() |> splitLabels
+        
+        let registrableLabels =
+            match findMatch domain with
+            | Exception ex ->
+                countLabels ex
+            | SimpleRule rule | Wildcard rule ->
+                countLabels rule + 1
+
+        if registrableLabels > domainLabels.Length 
+        then None
+        else Some (takeEndLabels registrableLabels domainLabels)
+
 
     type Domain = 
         { Registrable    : string
