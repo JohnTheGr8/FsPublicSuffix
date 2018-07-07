@@ -20,6 +20,9 @@ module Util =
     let skipLabels count =
         Array.skip count >> joinlabels
 
+    let skipEndLabels count =
+        Array.rev >> Array.skip count >> Array.rev >> joinlabels
+
     let takeEndLabels count =
         Array.rev >> Array.take count >> Array.rev >> joinlabels
 
@@ -123,13 +126,53 @@ module Parser =
         then None
         else Some (takeEndLabels registrableLabels domainLabels)
 
+    let parseTld (registrable: string) =
+        splitLabels registrable 
+        |> skipLabels 1
+
+    let getTld (domain: string) = 
+        getRegistrablePart domain
+        |> Option.map parseTld
+
+    let tryParseSubdomain (domain: string) (registrable: string) =
+        let domainLabels = splitLabels domain
+        let regLabels    = splitLabels registrable
+
+        if domainLabels.Length > regLabels.Length
+        then Some (skipEndLabels regLabels.Length domainLabels)
+        else None
+
+    let getSubdomain (domain: string) =
+        getRegistrablePart domain
+        |> Option.map (tryParseSubdomain domain)
+        |> Option.flatten
+    
+    let parseDomain (registrable: string) =
+        registrable |> splitLabels |> Array.head
+
+    let getDomain (domain: string) =
+        getRegistrablePart domain
+        |> Option.map parseDomain
 
     type Domain = 
         { Registrable    : string
           TopLevelDomain : string
           Domain         : string
           SubDomain      : string option }
+
+        static member TryParse (domain: string) = 
+            getRegistrablePart domain
+            |> Option.map (fun registrable ->
+                { Registrable    = registrable
+                  TopLevelDomain = parseTld registrable
+                  Domain         = parseDomain registrable
+                  SubDomain      = tryParseSubdomain domain registrable })
+
+        static member Parse (domain: string) : DomainType =
+            match Domain.TryParse domain with
+            | Some x -> ValidDomain x 
+            | _ -> InvalidDomain
     
-    type DomainType =
+    and DomainType =
         | ValidDomain of Domain
         | InvalidDomain
