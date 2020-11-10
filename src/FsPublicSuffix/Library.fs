@@ -53,7 +53,7 @@ module PublicSuffix =
             | '*' :: '.' :: _ -> Wildcard rule
             | _               -> SimpleRule rule
 
-    let private loadRuleSet =
+    let RuleSet = lazy (
         let url = "https://publicsuffix.org/list/public_suffix_list.dat"
         let client = new WebClient ()
         client.Encoding <- Encoding.UTF8
@@ -66,9 +66,8 @@ module PublicSuffix =
         |> Array.filter (String.IsNullOrEmpty >> not)        // skip empty lines
         |> Array.filter (fun x -> x.StartsWith("//") |> not) // skip comments
         |> Array.map (fun x -> x.Trim())
-
-    let RuleSet =
-        loadRuleSet |> Array.map RegistrationRule.Read
+        |> Array.map RegistrationRule.Read
+    )
 
     /// Try to match a domain to a given Public Suffix rule
     let tryMatch (domain: string) (rule: RegistrationRule) =
@@ -91,8 +90,8 @@ module PublicSuffix =
 
     /// Find all rules that match a given domain
     let findMatches (domain: string) =
-        RuleSet
-        |> Array.filter (tryMatch domain >> Option.isSome)
+        RuleSet.Value
+        |> Array.choose (tryMatch domain)
 
     /// Find the best matching rule for the given domain
     let findMatch (domain: string) =
