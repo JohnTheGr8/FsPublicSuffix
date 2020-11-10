@@ -54,7 +54,7 @@ module PublicSuffix =
             | _               -> SimpleRule rule
 
     let private loadRuleSet =
-        let url = "https://publicsuffix.org/list/effective_tld_names.dat"
+        let url = "https://publicsuffix.org/list/public_suffix_list.dat"
         let client = new WebClient ()
         client.Encoding <- Encoding.UTF8
 
