@@ -22,4 +22,4 @@ matrix:
       sudo: required
       
 script: 
-  - ./build.sh All
+  - ./build.sh
