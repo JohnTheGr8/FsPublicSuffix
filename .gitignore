@@ -255,3 +255,6 @@ TestResults.xml
 
 dist/
 lcov.info
+
+# Ionide cache
+.ionide/
