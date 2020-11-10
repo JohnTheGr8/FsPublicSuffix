@@ -12,7 +12,7 @@ let tests =
     testCase "Test Punycode Conversion" <| fun _ ->
       let (===) actual expected =
         Expect.equal actual expected "Punycode values should be equal"
-      
+
       let punycode = Util.toAscii
 
       punycode "食狮.com.cn" === "xn--85x722f.com.cn"
@@ -35,7 +35,7 @@ let tests =
       rule "com" =*= "foo.com"
       rule "*.jp" =*= "foo.bar.jp"
       rule "*.jp" =*= "bar.jp"
-      
+
       rule "公司.cn" =*= "xn--55qx5d.cn"
       rule "公司.cn" =*= "xn--85x722f.xn--55qx5d.cn"
       rule "公司.cn" =*= "公司.cn"
@@ -48,10 +48,10 @@ let RegistrablePartTests =
 
   let (===) actual expected =
     Expect.equal actual expected "Registrable domain doesn't match"
-  
+
   // test with the Test Data from https://raw.githubusercontent.com/publicsuffix/list/master/tests/test_psl.txt
   testList "Registrable Domain Part" [
-    
+
     testCase "null input" <| fun _ ->
       checkPublicSuffix "" === None
 
@@ -162,7 +162,7 @@ let HostNameTests =
 
   let hostname =
     Domain.TryParse >> Option.map (fun x -> x.Hostname)
-      
+
   let (===) actual expected =
     Expect.equal actual expected "Hostname is invalid"
 

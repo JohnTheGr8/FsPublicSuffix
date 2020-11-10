@@ -11,7 +11,7 @@ module Util =
     let splitLabels (domain: string) =
         domain.Split '.'
 
-    let joinlabels : string array -> string = 
+    let joinlabels : string array -> string =
         String.concat "."
 
     let countLabels =
@@ -26,7 +26,7 @@ module Util =
     let takeEndLabels count =
         Array.rev >> Array.take count >> Array.rev >> joinlabels
 
-    let internal toLower (x: string) = 
+    let internal toLower (x: string) =
         x.ToLower()
 
     let private idn = new IdnMapping()
@@ -39,7 +39,7 @@ module Util =
 
 module PublicSuffix =
 
-    type RegistrationRule = 
+    type RegistrationRule =
         | SimpleRule of string
         | Exception of string
         | Wildcard of string
@@ -60,7 +60,7 @@ module PublicSuffix =
         let url = "https://publicsuffix.org/list/effective_tld_names.dat"
         let client = new WebClient ()
         client.Encoding <- Encoding.UTF8
-        
+
         // download rule list
         let text = client.DownloadString(url)
 
@@ -69,7 +69,7 @@ module PublicSuffix =
         |> Array.filter (String.IsNullOrEmpty >> not)        // skip empty lines
         |> Array.filter (fun x -> x.StartsWith("//") |> not) // skip comments
         |> Array.map (fun x -> x.Trim())
-    
+
     let RuleSet =
         loadRuleSet |> Array.map RegistrationRule.Read
 
@@ -83,9 +83,9 @@ module PublicSuffix =
         then
             // The domain must contain as many or more labels than the rule
             None
-        else 
+        else
             let domainLabels = domainLabels |> Array.take ruleLabels.Length
-            
+
             // for every pair of domain and rule label, either they
             // are identical, or the label from the rule is "*"
             if Array.zip ruleLabels domainLabels
@@ -101,13 +101,13 @@ module PublicSuffix =
     /// Find the best matching rule for the given domain
     let findMatch (domain: string) =
         let matchingRules = findMatches domain
-        
+
         matchingRules
         |> Array.tryFind (function Exception _ -> true | _ -> false)
         |> Option.defaultValue (
             matchingRules
             |> Array.sortByDescending (fun rule -> countLabels rule.Value)
-            |> Array.tryHead 
+            |> Array.tryHead
             |> Option.defaultValue (SimpleRule "*"))
 
 module Parser =
@@ -116,11 +116,11 @@ module Parser =
 
     /// Try to parse the registrable part of a hostname
     let getRegistrablePart (domain: string) =
-        
+
         if domain.StartsWith "." then None else
-        
+
         let domainLabels = toLower domain |> splitLabels
-        
+
         let registrableLabels =
             match findMatch domain with
             | Exception ex ->
@@ -128,7 +128,7 @@ module Parser =
             | SimpleRule rule | Wildcard rule ->
                 countLabels rule + 1
 
-        if registrableLabels > domainLabels.Length 
+        if registrableLabels > domainLabels.Length
         then None
         else Some (takeEndLabels registrableLabels domainLabels)
 
@@ -136,7 +136,7 @@ module Parser =
         splitLabels >> skipLabels 1
 
     /// Try to extract the Top Level Domain
-    let getTld (domain: string) = 
+    let getTld (domain: string) =
         getRegistrablePart domain
         |> Option.map parseTld
 
@@ -153,7 +153,7 @@ module Parser =
         getRegistrablePart domain
         |> Option.map (tryParseSubdomain domain)
         |> Option.flatten
-    
+
     let internal parseDomain =
         splitLabels >> Array.head
 
@@ -162,13 +162,13 @@ module Parser =
         getRegistrablePart domain
         |> Option.map parseDomain
 
-    type Domain = 
+    type Domain =
         { Registrable    : string
           TopLevelDomain : string
           Domain         : string
           SubDomain      : string option }
 
-        static member TryParse (domain: string) = 
+        static member TryParse (domain: string) =
             getRegistrablePart domain
             |> Option.map (fun registrable ->
                 { Registrable    = registrable
@@ -178,14 +178,14 @@ module Parser =
 
         static member Parse (domain: string) : ParsedDomain =
             match Domain.TryParse domain with
-            | Some x -> ValidDomain x 
+            | Some x -> ValidDomain x
             | _ -> InvalidDomain
 
-        member x.Hostname = 
+        member x.Hostname =
             match x.SubDomain with
             | Some sub -> sprintf "%s.%s.%s" sub x.Domain x.TopLevelDomain
             | None     -> sprintf "%s.%s" x.Domain x.TopLevelDomain
-    
+
     and ParsedDomain =
         | ValidDomain of Domain
         | InvalidDomain
