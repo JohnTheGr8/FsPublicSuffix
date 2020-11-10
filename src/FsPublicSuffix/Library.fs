@@ -9,7 +9,7 @@ open System.Text
 module Util =
 
     let splitLabels (domain: string) =
-        domain.Split '.'
+        domain.ToLower().Split '.'
 
     let joinlabels : string array -> string =
         String.concat "."
@@ -25,9 +25,6 @@ module Util =
 
     let takeEndLabels count =
         Array.rev >> Array.take count >> Array.rev >> joinlabels
-
-    let internal toLower (x: string) =
-        x.ToLower()
 
     let private idn = new IdnMapping()
 
@@ -75,9 +72,8 @@ module PublicSuffix =
 
     /// Try to match a domain to a given Public Suffix rule
     let tryMatch (domain: string) (rule: RegistrationRule) =
-        let domain       = toAscii domain
         let ruleLabels   = toAscii rule.Value |> splitLabels |> Array.rev
-        let domainLabels = domain |> splitLabels |> Array.rev
+        let domainLabels = toAscii domain     |> splitLabels |> Array.rev
 
         if domainLabels.Length < ruleLabels.Length
         then
@@ -119,7 +115,7 @@ module Parser =
 
         if domain.StartsWith "." then None else
 
-        let domainLabels = toLower domain |> splitLabels
+        let domainLabels = splitLabels domain
 
         let registrableLabels =
             match findMatch domain with
@@ -141,7 +137,7 @@ module Parser =
         |> Option.map parseTld
 
     let internal tryParseSubdomain (domain: string) (registrable: string) =
-        let domainLabels = splitLabels domain |> Array.map toLower
+        let domainLabels = splitLabels domain
         let regLabels    = splitLabels registrable
 
         if domainLabels.Length > regLabels.Length
