@@ -15,8 +15,6 @@ let distDir = __SOURCE_DIRECTORY__  @@ "dist"
 let distGlob = distDir @@ "*.nupkg"
 let toolsDir = __SOURCE_DIRECTORY__  @@ "tools"
 
-let coverageReportDir =  __SOURCE_DIRECTORY__  @@ "docs" @@ "coverage"
-
 let gitOwner = "JohnTheGr8"
 let gitRepoName = "FsPublicSuffix"
 
@@ -38,7 +36,7 @@ let isRelease () =
     |> Seq.exists ((=)"Release")
 
 Target "Clean" (fun _ ->
-    ["bin"; "temp" ; distDir; coverageReportDir]
+    ["bin"; "temp" ; distDir ]
     |> CleanDirs
 
     !! srcGlob
@@ -92,38 +90,6 @@ Target "DotnetTest" (fun _ ->
                     ]
                 })
 )
-
-Target "GenerateCoverageReport" (fun _ ->
-    let reportGenerator = "packages/build/ReportGenerator/tools/ReportGenerator.exe"
-    let coverageReports =
-        !!"tests/**/_Reports/MSBuildTest.xml"
-        |> String.concat ";"
-    let sourceDirs =
-        !! srcGlob
-        |> Seq.map DirectoryName
-        |> String.concat ";"
-    let executable = if EnvironmentHelper.isWindows then reportGenerator else "mono"
-    let independentArgs =
-            [
-                sprintf "-reports:%s"  coverageReports
-                sprintf "-targetdir:%s" coverageReportDir
-                // Add source dir
-                sprintf "-sourcedirs:%s" sourceDirs
-                // Ignore Tests and if AltCover.Recorder.g sneaks in
-                sprintf "-assemblyfilters:\"%s\"" "-*.Tests;-AltCover.Recorder.g"
-                sprintf "-Reporttypes:%s" "Html"
-            ]
-    let args =
-        (if EnvironmentHelper.isWindows
-         then independentArgs
-         else reportGenerator :: independentArgs)
-        |> String.concat " "
-    tracefn "%s %s" executable args
-    let exitCode = Shell.Exec(executable, args = args)
-    if exitCode <> 0 then
-        failwithf "%s failed with exit code: %d" reportGenerator exitCode
-)
-
 
 Target "WatchTests" (fun _ ->
     !! testsGlob
@@ -280,7 +246,6 @@ Target "Release" DoNothing
 "DotnetRestore"
   ==> "DotnetBuild"
   ==> "DotnetTest"
-  ==> "GenerateCoverageReport"
   ==> "DotnetPack"
   ==> "SourcelinkTest"
   ==> "Publish"
