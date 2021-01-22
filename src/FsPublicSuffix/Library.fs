@@ -118,12 +118,12 @@ module Parser =
 
         let registrableLabels =
             match findMatch domain with
-            | Exception ex ->
-                countLabels ex
-            | SimpleRule rule | Wildcard rule ->
-                countLabels rule + 1
+            | SimpleRule  "*" -> 0
+            | SimpleRule rule -> countLabels rule + 1
+            | Wildcard   rule -> countLabels rule + 1
+            | Exception    ex -> countLabels ex
 
-        if registrableLabels > domainLabels.Length
+        if registrableLabels = 0 || registrableLabels > domainLabels.Length
         then None
         else Some (takeEndLabels registrableLabels domainLabels)
 

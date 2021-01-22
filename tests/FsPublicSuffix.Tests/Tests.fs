@@ -68,9 +68,15 @@ let RegistrablePartTests =
 
     testCase "Unlisted TLD" <| fun _ ->
       checkPublicSuffix "example" === None
-      checkPublicSuffix "example.example" === Some "example.example"
-      checkPublicSuffix "b.example.example" === Some "example.example"
-      checkPublicSuffix "a.b.example.example" === Some "example.example"
+      checkPublicSuffix "example.example" === None
+      checkPublicSuffix "b.example.example" === None
+      checkPublicSuffix "a.b.example.example" === None
+
+    testCase "Listed, but non-Internet, TLD." <| fun _ ->
+      checkPublicSuffix "local" === None
+      checkPublicSuffix "example.local" === None
+      checkPublicSuffix "b.example.local" === None
+      checkPublicSuffix "a.b.example.local" === None
 
     testCase "TLD with only 1 rule" <| fun _ ->
       checkPublicSuffix "biz" === None
