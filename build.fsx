@@ -1,236 +1,177 @@
-#r @"packages/build/FAKE/tools/FakeLib.dll"
-open Fake
-open Fake.Git
-open Fake.AssemblyInfoFile
-open Fake.ReleaseNotesHelper
-open Fake.UserInputHelper
-open System
+#r "paket:
+nuget Fake.Core.Target
+nuget Fake.Core.ReleaseNotes
+nuget Fake.DotNet.Cli
+nuget Fake.DotNet.AssemblyInfoFile
+nuget Fake.Tools.Git //"
 
-let release = LoadReleaseNotes "RELEASE_NOTES.md"
+#load "./.fake/build.fsx/intellisense.fsx"
+
+open Fake
+open Fake.Core
+open Fake.DotNet
+open Fake.IO
+open Fake.IO.FileSystemOperators
+open Fake.IO.Globbing.Operators
+open Fake.Tools
+open System
+open System.IO
+
 let productName = "FsPublicSuffix"
 let sln = "FsPublicSuffix.sln"
 let srcGlob =__SOURCE_DIRECTORY__  @@ "src/**/*.??proj"
 let testsGlob = __SOURCE_DIRECTORY__  @@ "tests/**/*.??proj"
 let distDir = __SOURCE_DIRECTORY__  @@ "dist"
 let distGlob = distDir @@ "*.nupkg"
-let toolsDir = __SOURCE_DIRECTORY__  @@ "tools"
 
-let gitOwner = "JohnTheGr8"
-let gitRepoName = "FsPublicSuffix"
+let release = ReleaseNotes.load "RELEASE_NOTES.md"
 
-let configuration =
-    EnvironmentHelper.environVarOrDefault "CONFIGURATION" "Release"
+let releaseNotesFormatted =
+    release.Notes
+    |> Seq.map (sprintf "* %s\n")
+    |> String.concat ""
 
-
-module dotnet =
-    let watch program cmdParam args =
-        let argConcat =
-            args
-            |> String.concat " "
-        DotNetCli.RunCommand cmdParam (sprintf "watch %s %s" program argConcat)
-
-
-let isRelease () =
-    Fake.TargetHelper.CurrentTargetOrder
-    |> Seq.collect id
-    |> Seq.exists ((=)"Release")
-
-Target "Clean" (fun _ ->
-    ["bin"; "temp" ; distDir ]
-    |> CleanDirs
+Target.create "Clean" (fun _ ->
+    [ "bin"; distDir ]
+    |> Shell.cleanDirs
 
     !! srcGlob
     ++ testsGlob
     |> Seq.collect(fun p ->
         ["bin";"obj"]
         |> Seq.map(fun sp ->
-             IO.Path.GetDirectoryName p @@ sp)
+            Path.GetDirectoryName p @@ sp)
         )
-    |> CleanDirs
-
-    )
-
-Target "DotnetRestore" (fun _ ->
-    [sln ; toolsDir]
-    |> Seq.iter(fun dir ->
-        DotNetCli.Restore (fun c ->
-            { c with
-                Project = dir
-                //This makes sure that Proj2 references the correct version of Proj1
-                AdditionalArgs = [sprintf "/p:PackageVersion=%s" release.NugetVersion]
-            }))
+    |> Shell.cleanDirs
 )
 
-Target "DotnetBuild" (fun _ ->
-    DotNetCli.Build (fun c ->
+Target.create "DotnetRestore" (fun _ ->
+    DotNet.restore (fun c ->
         { c with
-            Project = sln
-            Configuration = configuration
+            Common = c.Common
+                     |> DotNet.Options.withAdditionalArgs [ sprintf "/p:PackageVersion=%s" release.NugetVersion ]
+        }) sln
+)
+
+Target.create "DotnetBuild" (fun _ ->
+    DotNet.build (fun c ->
+        { c with
+            Configuration = DotNet.BuildConfiguration.Release
             //This makes sure that Proj2 references the correct version of Proj1
-            AdditionalArgs =
-                [
-                    sprintf "/p:PackageVersion=%s" release.NugetVersion
-                    sprintf "/p:SourceLinkCreate=%b" (isRelease ())
-                    "--no-restore"
-                ]
-        }))
+            Common = c.Common
+                     |> DotNet.Options.withAdditionalArgs [
+                        sprintf "/p:PackageVersion=%s" release.NugetVersion
+                        "--no-restore"
+                     ]
+        }) sln
+)
 
-let invokeAsync f = async { f () }
-
-Target "DotnetTest" (fun _ ->
+Target.create "DotnetTest" (fun _ ->
     !! testsGlob
     |> Seq.iter (fun proj ->
-        DotNetCli.Test <| fun c ->
+        DotNet.test (fun c ->
             { c with
-                Project = proj
-                Configuration = configuration
-                AdditionalArgs =
-                    [
-                        "--no-build"
-                    ]
-                })
+                Configuration = DotNet.BuildConfiguration.Release
+                Common = c.Common
+                         |> DotNet.Options.withAdditionalArgs [ "--no-build" ]
+            }) proj
+    )
 )
 
-Target "WatchTests" (fun _ ->
+Target.create "WatchTests" (fun _ ->
     !! testsGlob
-    |> Seq.map(fun proj -> fun () ->
-        dotnet.watch "test"
-            (fun cmd ->
-                { cmd with
-                     WorkingDir = IO.Path.GetDirectoryName proj
-                })
-            []
-    )
-    |> Seq.iter (invokeAsync >> Async.Catch >> Async.Ignore >> Async.Start)
+    |> Seq.map(fun proj -> async {
+        DotNet.exec
+            (DotNet.Options.withWorkingDirectory (Path.GetDirectoryName proj))
+            "watch run"
+            ""
+        |> ignore
+    })
+    |> Seq.iter (Async.Catch >> Async.Ignore >> Async.Start)
 
     printfn "Press Ctrl+C (or Ctrl+Break) to stop..."
     let cancelEvent = Console.CancelKeyPress |> Async.AwaitEvent |> Async.RunSynchronously
     cancelEvent.Cancel <- true
 )
 
-Target "AssemblyInfo" (fun _ ->
+Target.create "AssemblyInfo" (fun _ ->
     let releaseChannel =
         match release.SemVer.PreRelease with
         | Some pr -> pr.Name
         | _ -> "release"
+    let releaseDate =
+        release.Date.Value
+
     let getAssemblyInfoAttributes projectName =
-        [ Attribute.Title (projectName)
-          Attribute.Product productName
-          Attribute.Version release.AssemblyVersion
-          Attribute.Metadata("ReleaseDate", release.Date.Value.ToString("o"))
-          Attribute.FileVersion release.AssemblyVersion
-          Attribute.InformationalVersion release.AssemblyVersion
-          Attribute.Metadata("ReleaseChannel", releaseChannel)
-          Attribute.Metadata("GitHash", Information.getCurrentSHA1(null))
+        [
+          AssemblyInfo.Title (projectName)
+          AssemblyInfo.Product productName
+          AssemblyInfo.Version release.AssemblyVersion
+          AssemblyInfo.Metadata("ReleaseDate", releaseDate.ToString("o"))
+          AssemblyInfo.FileVersion release.AssemblyVersion
+          AssemblyInfo.InformationalVersion release.AssemblyVersion
+          AssemblyInfo.Metadata("ReleaseChannel", releaseChannel)
+          AssemblyInfo.Metadata("GitHash", Git.Information.getCurrentSHA1(null))
         ]
 
     let getProjectDetails projectPath =
-        let projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath)
+        let projectName = Path.GetFileNameWithoutExtension(projectPath)
         ( projectPath,
           projectName,
-          System.IO.Path.GetDirectoryName(projectPath),
+          Path.GetDirectoryName(projectPath),
           (getAssemblyInfoAttributes projectName)
         )
 
     !! srcGlob
     ++ testsGlob
     |> Seq.map getProjectDetails
-    |> Seq.iter (fun (projFileName, projectName, folderName, attributes) ->
-        match projFileName with
-        | Fsproj -> CreateFSharpAssemblyInfo (folderName @@ "AssemblyInfo.fs") attributes
-        | Csproj -> CreateCSharpAssemblyInfo ((folderName @@ "Properties") @@ "AssemblyInfo.cs") attributes
-        | Vbproj -> CreateVisualBasicAssemblyInfo ((folderName @@ "My Project") @@ "AssemblyInfo.vb") attributes
-        | _ -> ()
-        )
+    |> Seq.iter (fun (projFileName, _, folderName, attributes) ->
+        if projFileName.EndsWith("fsproj") then
+            AssemblyInfoFile.createFSharp (folderName @@ "AssemblyInfo.fs") attributes
+    )
 )
 
-Target "DotnetPack" (fun _ ->
+Target.create "DotnetPack" (fun _ ->
     !! srcGlob
     |> Seq.iter (fun proj ->
-        DotNetCli.Pack (fun c ->
+        DotNet.pack (fun c ->
             { c with
-                Project = proj
-                Configuration = configuration
-                OutputPath = distDir
-                AdditionalArgs =
-                    [
+                Configuration = DotNet.BuildConfiguration.Release
+                OutputPath = Some distDir
+                Common =
+                    c.Common
+                    |> DotNet.Options.withAdditionalArgs [
                         sprintf "/p:PackageVersion=%s" release.NugetVersion
-                        sprintf "/p:PackageReleaseNotes=\"%s\"" (String.Join("\n",release.Notes))
-                        sprintf "/p:SourceLinkCreate=%b" (isRelease ())
+                        sprintf "/p:PackageReleaseNotes=\"%s\"" releaseNotesFormatted
                     ]
-            })
+            }) proj
     )
 )
 
-Target "SourcelinkTest" (fun _ ->
+Target.create "SourcelinkTest" (fun _ ->
     !! distGlob
     |> Seq.iter (fun nupkg ->
-        DotNetCli.RunCommand
-            (fun p -> { p with WorkingDir = toolsDir} )
-            (sprintf "sourcelink test %s" nupkg)
+        let result = DotNet.exec id "sourcelink" (sprintf "test \"%s\"" nupkg)
+        if not result.OK then failwithf "sourcelink test failed: %A" result.Messages
     )
 )
 
-let isReleaseBranchCheck () =
+Target.create "GitRelease" (fun _ ->
     let releaseBranch = "master"
-    if Git.Information.getBranchName "" <> releaseBranch then failwithf "Not on %s.  If you want to release please switch to this branch." releaseBranch
+    if Git.Information.getBranchName "" <> releaseBranch then
+        failwithf "Not on %s. If you want to release please switch to this branch." releaseBranch
 
-Target "Publish" (fun _ ->
-    isReleaseBranchCheck ()
+    Git.Staging.stageAll ""
+    Git.Commit.exec "" (sprintf "Bump version to %s \n%s" release.NugetVersion releaseNotesFormatted)
+    Git.Branches.push ""
 
-    Paket.Push(fun c ->
-            { c with
-                PublishUrl = "https://www.nuget.org"
-                WorkingDir = "dist"
-            }
-        )
+    Git.Branches.tag "" release.NugetVersion
+    Git.Branches.pushTag "" "origin" release.NugetVersion
 )
 
-Target "GitRelease" (fun _ ->
-    isReleaseBranchCheck ()
+Target.create "Release" ignore
 
-    let releaseNotesGitCommitFormat = ("",release.Notes |> Seq.map(sprintf "* %s\n")) |> String.Join
-
-    StageAll ""
-    Git.Commit.Commit "" (sprintf "Bump version to %s \n%s" release.NugetVersion releaseNotesGitCommitFormat)
-    Branches.push ""
-
-    Branches.tag "" release.NugetVersion
-    Branches.pushTag "" "origin" release.NugetVersion
-)
-
-#load "paket-files/build/fsharp/FAKE/modules/Octokit/Octokit.fsx"
-open Octokit
-
-Target "GitHubRelease" (fun _ ->
-    let client =
-        match Environment.GetEnvironmentVariable "GITHUB_TOKEN" with
-        | null ->
-            let user =
-                match getBuildParam "github-user" with
-                | s when not (String.IsNullOrWhiteSpace s) -> s
-                | _ -> getUserInput "Username: "
-            let pw =
-                match getBuildParam "github-pw" with
-                | s when not (String.IsNullOrWhiteSpace s) -> s
-                | _ -> getUserPassword "Password: "
-
-            createClient user pw
-        | token -> createClientWithToken token
-
-
-    client
-    |> createDraft gitOwner gitRepoName release.NugetVersion (release.SemVer.PreRelease <> None) release.Notes
-    |> fun draft ->
-        !! distGlob
-        |> Seq.fold (fun draft pkg -> draft |> uploadFile pkg) draft
-    |> releaseDraft
-    |> Async.RunSynchronously
-
-)
-
-Target "Release" DoNothing
-
+open TargetOperators
 
 // Only call Clean if DotnetPack was in the call chain
 // Ensure Clean is called before DotnetRestore
@@ -241,19 +182,16 @@ Target "Release" DoNothing
 // Ensure AssemblyInfo is called after DotnetRestore and before DotnetBuild
 "DotnetRestore" ?=> "AssemblyInfo"
 "AssemblyInfo" ?=> "DotnetBuild"
-"AssemblyInfo" ==> "Publish"
 
 "DotnetRestore"
   ==> "DotnetBuild"
   ==> "DotnetTest"
   ==> "DotnetPack"
   ==> "SourcelinkTest"
-  ==> "Publish"
   ==> "GitRelease"
-  ==> "GitHubRelease"
   ==> "Release"
 
 "DotnetRestore"
  ==> "WatchTests"
 
-RunTargetOrDefault "DotnetPack"
+Target.runOrDefaultWithArguments "DotnetPack"
