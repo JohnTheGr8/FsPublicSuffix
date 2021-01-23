@@ -9,7 +9,7 @@ open System.Text
 module Util =
 
     let splitLabels (domain: string) =
-        domain.ToLower().Split '.'
+        domain.Split '.'
 
     let joinlabels : string array -> string =
         String.concat "."
@@ -25,6 +25,19 @@ module Util =
 
     let takeEndLabels count =
         Array.rev >> Array.take count >> Array.rev >> joinlabels
+
+    let tryNormalizeFqdn (str: string) =
+        let url =
+            let fqdn = str.ToString()
+            if fqdn.StartsWith "https://" || fqdn.StartsWith "http://" then
+                fqdn
+            else
+                // add protocol at the start of domain so that Uri.TryCreate doesn't fail
+                "https://" + fqdn
+
+        match Uri.TryCreate (url, UriKind.RelativeOrAbsolute) with
+        | true, uri -> Some uri.Host
+        | false,  _ -> None
 
     let private idn = new IdnMapping()
 
@@ -112,8 +125,6 @@ module Parser =
     /// Try to parse the registrable part of a hostname
     let getRegistrablePart (domain: string) =
 
-        if domain.StartsWith "." then None else
-
         let domainLabels = splitLabels domain
 
         let registrableLabels =
@@ -164,12 +175,16 @@ module Parser =
           SubDomain      : string option }
 
         static member TryParse (domain: string) =
-            getRegistrablePart domain
-            |> Option.map (fun registrable ->
-                { Registrable    = registrable
-                  TopLevelDomain = parseTld registrable
-                  Domain         = parseDomain registrable
-                  SubDomain      = tryParseSubdomain domain registrable })
+            match tryNormalizeFqdn domain with
+            | Some domain ->
+                getRegistrablePart domain
+                |> Option.map (fun registrable ->
+                    { Registrable    = registrable
+                      TopLevelDomain = parseTld registrable
+                      Domain         = parseDomain registrable
+                      SubDomain      = tryParseSubdomain domain registrable })
+            | None ->
+                None
 
         static member Parse (domain: string) : ParsedDomain =
             match Domain.TryParse domain with

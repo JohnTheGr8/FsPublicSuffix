@@ -44,7 +44,9 @@ let tests =
 [<Tests>]
 let RegistrablePartTests =
 
-  let checkPublicSuffix = Parser.getRegistrablePart
+  let checkPublicSuffix =
+    Parser.Domain.TryParse
+    >> Option.map (fun fqdn -> fqdn.Registrable)
 
   let (===) actual expected =
     Expect.equal actual expected "Registrable domain doesn't match"
@@ -187,5 +189,11 @@ let HostNameTests =
       hostname "www.食狮.中国" === Some "www.食狮.中国"
       hostname "xn--85x722f.xn--fiqs8s" === Some "xn--85x722f.xn--fiqs8s"
       hostname "www.xn--85x722f.xn--fiqs8s" === Some "www.xn--85x722f.xn--fiqs8s"
+
+    testCase "URLs" <| fun _ ->
+      hostname "https://www.youtube.com" === Some "www.youtube.com"
+      hostname "https://www.youtube.com/" === Some "www.youtube.com"
+      hostname "https://github.com/JohnTheGr8/FsPublicSuffix" === Some "github.com"
+      hostname "github.com/JohnTheGr8/FsPublicSuffix" === Some "github.com"
 
   ]
