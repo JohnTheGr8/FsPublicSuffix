@@ -45,7 +45,7 @@ let tests =
 let RegistrablePartTests =
 
   let checkPublicSuffix =
-    Parser.Domain.TryParse
+    FullyQualifiedDomainName.TryParse
     >> Option.map (fun fqdn -> fqdn.Registrable)
 
   let (===) actual expected =
@@ -163,37 +163,36 @@ let RegistrablePartTests =
       checkPublicSuffix "xn--fiqs8s" === None
   ]
 
-open Parser
-
 [<Tests>]
-let HostNameTests =
+let FqdnTests =
 
-  let hostname =
-    Domain.TryParse >> Option.map (fun x -> x.Hostname)
+  let fqdn =
+    FullyQualifiedDomainName.TryParse
+    >> Option.map (fun x -> x.FQDN)
 
   let (===) actual expected =
-    Expect.equal actual expected "Hostname is invalid"
+    Expect.equal actual expected "the FQDN is invalid"
 
-  testList "Parsing Host Name" [
+  testList "Fully Qualified Domain Name" [
 
     testCase "Mixed case" <| fun _ ->
-      hostname "example.COM" === Some "example.com"
-      hostname "WwW.Example.COM" === Some "www.example.com"
+      fqdn "example.COM" === Some "example.com"
+      fqdn "WwW.Example.COM" === Some "www.example.com"
 
     testCase "Domains with subdomains" <| fun _ ->
-      hostname "b.domain.biz" === Some "b.domain.biz"
-      hostname "a.b.domain.biz" === Some "a.b.domain.biz"
+      fqdn "b.domain.biz" === Some "b.domain.biz"
+      fqdn "a.b.domain.biz" === Some "a.b.domain.biz"
 
     testCase "IDN and punycode" <| fun _ ->
-      hostname "食狮.中国" === Some "食狮.中国"
-      hostname "www.食狮.中国" === Some "www.食狮.中国"
-      hostname "xn--85x722f.xn--fiqs8s" === Some "xn--85x722f.xn--fiqs8s"
-      hostname "www.xn--85x722f.xn--fiqs8s" === Some "www.xn--85x722f.xn--fiqs8s"
+      fqdn "食狮.中国" === Some "食狮.中国"
+      fqdn "www.食狮.中国" === Some "www.食狮.中国"
+      fqdn "xn--85x722f.xn--fiqs8s" === Some "xn--85x722f.xn--fiqs8s"
+      fqdn "www.xn--85x722f.xn--fiqs8s" === Some "www.xn--85x722f.xn--fiqs8s"
 
     testCase "URLs" <| fun _ ->
-      hostname "https://www.youtube.com" === Some "www.youtube.com"
-      hostname "https://www.youtube.com/" === Some "www.youtube.com"
-      hostname "https://github.com/JohnTheGr8/FsPublicSuffix" === Some "github.com"
-      hostname "github.com/JohnTheGr8/FsPublicSuffix" === Some "github.com"
+      fqdn "https://www.youtube.com" === Some "www.youtube.com"
+      fqdn "https://www.youtube.com/" === Some "www.youtube.com"
+      fqdn "https://github.com/JohnTheGr8/FsPublicSuffix" === Some "github.com"
+      fqdn "github.com/JohnTheGr8/FsPublicSuffix" === Some "github.com"
 
   ]

@@ -168,34 +168,31 @@ module Parser =
         getRegistrablePart domain
         |> Option.map parseDomain
 
-    type Domain =
-        { Registrable    : string
-          TopLevelDomain : string
-          Domain         : string
-          SubDomain      : string option }
+type FullyQualifiedDomainName =
+    { TopLevelDomain : string
+      Domain         : string
+      SubDomain      : string option }
 
-        static member TryParse (domain: string) =
-            match tryNormalizeFqdn domain with
-            | Some domain ->
-                getRegistrablePart domain
-                |> Option.map (fun registrable ->
-                    { Registrable    = registrable
-                      TopLevelDomain = parseTld registrable
-                      Domain         = parseDomain registrable
-                      SubDomain      = tryParseSubdomain domain registrable })
-            | None ->
-                None
+    static member TryParse (input: string) =
+        match tryNormalizeFqdn input with
+        | Some domain ->
+            Parser.getRegistrablePart domain
+            |> Option.map (fun registrable ->
+                { TopLevelDomain = Parser.parseTld registrable
+                  Domain         = Parser.parseDomain registrable
+                  SubDomain      = Parser.tryParseSubdomain domain registrable })
+        | None ->
+            None
 
-        static member Parse (domain: string) : ParsedDomain =
-            match Domain.TryParse domain with
-            | Some x -> ValidDomain x
-            | _ -> InvalidDomain
+    static member Parse (input: string) =
+        match FullyQualifiedDomainName.TryParse input with
+        | Some x -> x
+        | None -> failwithf "Could not parse %s into a Fully Qualified Domain Name" input
 
-        member x.Hostname =
-            match x.SubDomain with
-            | Some sub -> sprintf "%s.%s.%s" sub x.Domain x.TopLevelDomain
-            | None     -> sprintf "%s.%s" x.Domain x.TopLevelDomain
+    member x.FQDN =
+        match x.SubDomain with
+        | Some sub -> sprintf "%s.%s.%s" sub x.Domain x.TopLevelDomain
+        | None     -> sprintf "%s.%s" x.Domain x.TopLevelDomain
 
-    and ParsedDomain =
-        | ValidDomain of Domain
-        | InvalidDomain
+    member x.Registrable =
+        sprintf "%s.%s" x.Domain x.TopLevelDomain
