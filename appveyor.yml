@@ -16,3 +16,10 @@ artifacts:
   - path: 'dist\FsPublicSuffix.*.nupkg'
     name: nupkg
 
+deploy:
+  - provider: NuGet
+    artifact: nupkg
+    api_key:
+      secure: taw4vkPRI4Zxhu7wxTayZGlKUv54FOb81TJ+nBAGs64ld1pzcP+94F5ZHn4XAfKj
+    on:
+      APPVEYOR_REPO_TAG: true
