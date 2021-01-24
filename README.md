@@ -1,47 +1,65 @@
 # FsPublicSuffix [![Build status](https://ci.appveyor.com/api/projects/status/github/JohnTheGr8/FsPublicSuffix?svg=true)](https://ci.appveyor.com/project/JohnTheGr8/FsPublicSuffix) [![NuGet Badge](https://buildstats.info/nuget/FsPublicSuffix)](https://www.nuget.org/packages/FsPublicSuffix/)
 
-Parse and separate hostnames accurately, using the [Public Suffix List](https://publicsuffix.org/).
+Parse and separate **Fully Qualified Domain Names** accurately, using the [Public Suffix List](https://publicsuffix.org/).
 
 ## Usage
 
-Here's some sample code to demonstrate how to parse domains and extract their individual parts.
+The interesting part of this library is the `FullyQualifiedDomainName` record type and the two parsing methods available:
 
-First, load the assembly (F# Interactive):
+1. `FullyQualifiedDomainName.TryParse`: safely parse the input string into a FQDN (returns an `option`)
+2. `FullyQualifiedDomainName.Parse` : unsafe version of `TryParse`, throws an exception if the input string cannot be parsed
+
+Here's a simple F# Interactive session that demonstrates how you can use this library:
 
 ```fsharp
-> #load "Library.fs";;
-> open FsPublicSuffix.Parser;;
+> #load "nuget: FsPublicSuffix"
+> open FsPublicSuffix
+
+> FullyQualifiedDomainName.TryParse "www.google.co.uk"
+val it : FullyQualifiedDomainName option = Some { TopLevelDomain = "co.uk"
+                                                  Domain = "google"
+                                                  SubDomain = Some "www" }
+
 ```
 
-The `Domain.Parse` method returns a value of type `ParsedDomain` which can be a `ValidDomain` of `Domain` (which contains all extracted hostname parts):
+You can also pass full URLs as input:
 
 ```fsharp
-> Domain.Parse "www.google.co.uk";;
-val it : ParsedDomain = ValidDomain {Registrable = "google.co.uk";
-                                     TopLevelDomain = "co.uk";
-                                     Domain = "google";
-                                     SubDomain = Some "www";}
+> let fqdn = FullyQualifiedDomainName.Parse "https://www.youtube.com/feed/subscriptions"
+val fqdn : FullyQualifiedDomainName = { TopLevelDomain = "com"
+                                        Domain = "youtube"
+                                        SubDomain = Some "www" }
 ```
 
-or returns an `InvalidDomain` :
+There are two other available members:
 
 ```fsharp
-> Domain.Parse ".google.co.uk";;
-val it : ParsedDomain = InvalidDomain
+// get the FQDN of the parsed record
+fqdn.FQDN // www.youtube.com
+
+// get the registrable domain
+fqdn.Registrable // youtube.com
 ```
 
-The `Domain.TryParse` method is similar but returns a `Domain option` value. 
+Here's a few more quick examples:
 
 ```fsharp
-Domain.TryParse "uk.com" // None
+// non-existent TLDs are not accepted
+FullyQualifiedDomainName.TryParse "google.nope" // None
 
-let domain = Domain.TryParse "a.b.example.example" // Some { ... }
+// domains that cannot be registered are not accepted
+FullyQualifiedDomainName.TryParse "co.uk" // None
+FullyQualifiedDomainName.TryParse "uk.com" // None
 
-domain.Value.Hostname // "a.b.example.example"
+// IDN and punycode are also supported
+FullyQualifiedDomainName.TryParse "ουτοπία.δπθ.gr" // Some { ... }
+FullyQualifiedDomainName.TryParse "xn--pxaix.gr" // Some { ... }
 ```
 
 ---
 
 ## Builds
 
-[![Build History](https://buildstats.info/appveyor/chart/JohnTheGr8/FsPublicSuffix)](https://ci.appveyor.com/project/JohnTheGr8/FsPublicSuffix)                    
+[![Build History](https://buildstats.info/appveyor/chart/JohnTheGr8/FsPublicSuffix)](https://ci.appveyor.com/project/JohnTheGr8/FsPublicSuffix)
+
+[![Build History](https://buildstats.info/github/chart/JohnTheGr8/FsPublicSuffix)](https://github.com/JohnTheGr8/FsPublicSuffix/actions)
